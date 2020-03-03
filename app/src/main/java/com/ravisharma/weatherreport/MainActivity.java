@@ -2,16 +2,23 @@ package com.ravisharma.weatherreport;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.text.InputType;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -32,15 +39,19 @@ import java.util.Locale;
 
 public class MainActivity extends AppCompatActivity {
 
-    //    String CITY = "chandigarh,IN";
+    String CITY = "chandigarh,IN";
     String LAT = "";
     String LON = "";
+    String lat_lon_url = "";
+    String location_url = "";
+
     String API = "07696a47cc3a0ba92b3100696957dd49";
 
     private double wayLatitude = 0.0, wayLongitude = 0.0;
 
     TextView addressTxt, updated_atTxt, statusTxt, tempTxt, temp_minTxt, temp_maxTxt, sunriseTxt,
             sunsetTxt, windTxt, pressureTxt, humidityTxt;
+    Toolbar toolbar;
 
     private FusedLocationProviderClient fusedLocationClient;
     private LocationRequest locationRequest;
@@ -53,6 +64,9 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        toolbar = findViewById(R.id.toolbar);
+        toolbar.setTitle("");
+        setSupportActionBar(toolbar);
 
         addressTxt = findViewById(R.id.address);
         updated_atTxt = findViewById(R.id.updated_at);
@@ -92,11 +106,10 @@ public class MainActivity extends AppCompatActivity {
                         wayLatitude = location.getLatitude();
                         wayLongitude = location.getLongitude();
                         if (!isContinue) {
-                            //txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
                             LAT = String.valueOf(wayLatitude);
                             LON = String.valueOf(wayLongitude);
-
-                            new weatherTask().execute();
+                            lat_lon_url = "https://api.openweathermap.org/data/2.5/weather?lat=" + LAT + "&lon=" + LON + "&units=metric&appid=" + API;
+                            new weatherTask(lat_lon_url).execute();
                         }
                         if (!isContinue && fusedLocationClient != null) {
                             fusedLocationClient.removeLocationUpdates(locationCallback);
@@ -107,6 +120,47 @@ public class MainActivity extends AppCompatActivity {
         };
 
         getLocation();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.search_menu, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Enter Location");
+
+        // Set up the input
+        final EditText input = new EditText(this);
+        input.setHint("Enter Location Name Here");
+        input.requestFocus();
+
+        // Specify the type of input expected; this, for example, sets the input as a password, and will mask the text
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        builder.setView(input);
+
+        // Set up the buttons
+        builder.setPositiveButton("OK", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                CITY = input.getText().toString();
+                location_url = "https://api.openweathermap.org/data/2.5/weather?q=" + CITY + "&units=metric&appid=" + API;
+                new weatherTask(location_url).execute();
+            }
+        });
+        builder.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                dialog.cancel();
+            }
+        });
+
+        builder.show();
+
+        return super.onOptionsItemSelected(item);
     }
 
     private void getLocation() {
@@ -129,8 +183,8 @@ public class MainActivity extends AppCompatActivity {
                             wayLongitude = location.getLongitude();
                             LAT = String.valueOf(wayLatitude);
                             LON = String.valueOf(wayLongitude);
-
-                            new weatherTask().execute();
+                            lat_lon_url = "https://api.openweathermap.org/data/2.5/weather?lat=" + LAT + "&lon=" + LON + "&units=metric&appid=" + API;
+                            new weatherTask(lat_lon_url).execute();
                         } else {
                             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
                         }
@@ -168,17 +222,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     class weatherTask extends AsyncTask<String, Void, String> {
+
+        String url;
+
+        public weatherTask(String url) {
+            this.url = url;
+        }
+
         @Override
         protected void onPreExecute() {
             super.onPreExecute();
 
             /* Showing the ProgressBar, Making the main design GONE */
             findViewById(R.id.loader).setVisibility(View.VISIBLE);
-            findViewById(R.id.errorText).setVisibility(View.GONE);
         }
 
         protected String doInBackground(String... args) {
-            String response = HttpRequest.excuteGet("https://api.openweathermap.org/data/2.5/weather?lat=" + LAT + "&lon=" + LON + "&units=metric&appid=" + API);
+            String response = HttpRequest.excuteGet(url);
             return response;
         }
 
@@ -229,7 +289,7 @@ public class MainActivity extends AppCompatActivity {
 
             } catch (JSONException e) {
                 findViewById(R.id.loader).setVisibility(View.GONE);
-                findViewById(R.id.errorText).setVisibility(View.VISIBLE);
+                Toast.makeText(MainActivity.this, "Not Valid Location", Toast.LENGTH_SHORT).show();
             }
 
         }
